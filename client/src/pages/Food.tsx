@@ -37,21 +37,21 @@ interface LocalCartItem extends Food {
 // Food item component
 function FoodItem({ item, onAddToCart, cartLoading }: { item: Food; onAddToCart: (item: Food) => void; cartLoading: boolean }) {
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden bg-creamy/5 border border-quicktap-creamy/90 hover:shadow-2xl transition-shadow duration-200 rounded-2xl">
       <div className="aspect-video w-full overflow-hidden">
         <img src={item.image || "/placeholder.svg"} alt={item.name} className="h-full w-full object-cover" />
       </div>
       <CardHeader className="p-4">
         <div className="flex justify-between items-start">
-          <CardTitle className="text-lg">{item.name}</CardTitle>
-          <Badge variant="outline" className="border-green-500 text-green-500">
+          <CardTitle className="text-xl text-quicktap-creamy">{item.name}</CardTitle>
+          <Badge variant="outline" className="border-quicktap-creamy text-quicktap-creamy">
             {item.category}
           </Badge>
         </div>
-        <CardDescription>{item.description}</CardDescription>
+        <CardDescription className="text-base text-quicktap-creamy/60">{item.description}</CardDescription>
       </CardHeader>
       <CardFooter className="p-4 pt-0 flex justify-between items-center">
-        <span className="font-bold">₹{item.price}</span>
+        <span className="font-bold text-emerald-500 text-2xl">₹{item.price}</span>
         <Button
           onClick={() => onAddToCart(item)}
           size="sm"
@@ -79,680 +79,226 @@ const userPreferences = {
   seasonalPreferences: {} as Record<string, number>, // Seasonal food preferences
 };
 
-// NEW: Predictive recommendation algorithm based on user behavior
-function generatePredictiveRecommendations(allFoodItems: Food[], cart: CartItem[], userId: string) {
-  let recommendations: (Food & { reason: string[] })[] = [];
+// NEW: Predictive recommendation algorithm based on user behavior and actual order data
+async function generatePredictiveRecommendations(allFoodItems: Food[], cart: CartItem[], userId: string) {
+  let recommendations: (Food & { reason: string[]; totalScore: number })[] = [];
 
-  // Get user's ordering history from localStorage or API
-  const userOrderHistory = getUserOrderHistory(userId);
-
-  // Analyze ordering patterns
-  const patterns = analyzeOrderingPatterns(userOrderHistory);
-
-  allFoodItems.forEach(item => {
-    const reasons: string[] = [];
-
-    // Check if user orders similar items together
-    cart.forEach(cartItem => {
-      if (cartItem.category === item.category && cartItem._id !== item._id) {
-        reasons.push("Similar to items in your cart");
-      }
-    });
-
-    // Base reason for all items
-    reasons.push("Available item");
-
-    // 1. FREQUENCY ANALYSIS - How often user orders this food
-    const frequencyScore = calculateFrequencyScore(item._id, patterns.orderFrequency);
-    if (frequencyScore.points > 0) {
-      reasons.push(`Ordered ${frequencyScore.count} times before`);
-    }
-
-    // 2. RECENCY ANALYSIS - How recently user ordered this food
-    const recencyScore = calculateRecencyScore(item._id, patterns.lastOrdered);
-    if (recencyScore.points > 0) {
-      reasons.push(recencyScore.reason);
-    }
-
-    // 3. TIMING ANALYSIS - When user typically orders this food
-    const timingScore = calculateTimingScore(item._id, patterns.orderTiming);
-    if (timingScore.points > 0) {
-      reasons.push(timingScore.reason);
-    }
-
-    // 4. SEQUENCE ANALYSIS - What user orders together
-    const sequenceScore = calculateSequenceScore(item._id, patterns.orderSequences, cart);
-    if (sequenceScore.points > 0) {
-      reasons.push(sequenceScore.reason);
-    }
-
-    // 5. CATEGORY PREFERENCE - User's preferred food categories
-    const categoryScore = calculateCategoryScore(item.category, patterns.categoryPreferences);
-    if (categoryScore.points > 0) {
-      reasons.push(`Preferred category: ${item.category}`);
-    }
-
-    // 6. PRICE PATTERN - User's typical spending pattern
-    const priceScore = calculatePriceScore(item.price, patterns.pricePreferences);
-    if (priceScore.points > 0) {
-      reasons.push(priceScore.reason);
-    }
-
-    // 7. SEASONAL ANALYSIS - Time-based food preferences
-    const seasonalScore = calculateSeasonalScore(item, patterns.seasonalPreferences);
-    if (seasonalScore.points > 0) {
-      reasons.push(seasonalScore.reason);
-    }
-
-    // 8. SIMILARITY TO CART - Items similar to what's already in cart
-    const similarityScore = calculateSimilarityScore(item, cart, patterns);
-    if (similarityScore.points > 0) {
-      reasons.push(similarityScore.reason);
-    }
-
-    // 9. AVAILABILITY BOOST
-    if (item.isAvailable) {
-      reasons.push("Currently available");
-    }
-
-    // 10. AVOID RECOMMENDING ITEMS ALREADY IN CART
-    if (cart.some(cartItem => cartItem._id === item._id)) {
-      recommendations.push({ ...item, reason: ["Already in cart"] });
-      return; // Skip to next item
-    }
-
-    recommendations.push({ ...item, reason: reasons.slice(0, 3) }); // Show top 3 reasons
-  });
-
-  // Sort by number of reasons (more reasons = higher recommendation)
-  recommendations.sort((a, b) => b.reason.length - a.reason.length);
-
-  // Return top 4 recommendations
-  return recommendations.slice(0, 2);
-}
-
-// NEW: Get user's ordering history
-function getUserOrderHistory(userId: string) {
   try {
-    // Try to get from localStorage first
-    const storedHistory = localStorage.getItem(`user-orders-${userId}`);
-    if (storedHistory) {
-      return JSON.parse(storedHistory);
+    // Fetch user's actual orders from backend
+    const userOrders = await fetchUserOrders(userId);
+    console.log('📊 User orders fetched:', userOrders);
+
+    // If new user (no order history) AND empty cart, don't show recommendations
+    if ((!userOrders || userOrders.length === 0) && (!cart || cart.length === 0)) {
+      console.log('👤 New user with empty cart - no recommendations');
+      return [];
     }
 
-    // Fallback: return empty history for new users
-    return {
-      orders: [],
-      lastUpdated: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('Error getting user order history:', error);
-    return { orders: [], lastUpdated: new Date().toISOString() };
-  }
-}
-
-// NEW: Analyze ordering patterns from user history
-function analyzeOrderingPatterns(orderHistory: any) {
-  const patterns = {
-    orderFrequency: {} as Record<string, number>,
-    orderTiming: {} as Record<string, number[]>,
-    orderSequences: [] as string[][],
-    lastOrdered: {} as Record<string, Date>,
-    categoryPreferences: {} as Record<string, number>,
-    pricePreferences: { min: 0, max: 0, avg: 0 },
-    seasonalPreferences: {} as Record<string, Record<number, number>>
-  };
-
-  if (!orderHistory.orders || orderHistory.orders.length === 0) {
-    return patterns;
-  }
-
-  const orders = orderHistory.orders;
-
-  // Analyze frequency and timing
-  orders.forEach((order: any) => {
-    order.items.forEach((item: any) => {
-      const foodId = item.foodId || item._id;
-
-      // Count frequency
-      patterns.orderFrequency[foodId] = (patterns.orderFrequency[foodId] || 0) + 1;
-
-      // Record timing (hour of day)
-      const orderHour = new Date(order.orderDate || order.createdAt).getHours();
-      if (!patterns.orderTiming[foodId]) {
-        patterns.orderTiming[foodId] = [];
-      }
-      patterns.orderTiming[foodId].push(orderHour);
-
-      // Record last ordered date
-      const orderDate = new Date(order.orderDate || order.createdAt);
-      if (!patterns.lastOrdered[foodId] || orderDate > patterns.lastOrdered[foodId]) {
-        patterns.lastOrdered[foodId] = orderDate;
-      }
-    });
-
-    // Analyze order sequences (what was ordered together)
-    if (order.items.length > 1) {
-      const itemIds = order.items.map((item: any) => item.foodId || item._id);
-      patterns.orderSequences.push(itemIds);
-    }
-
-    // Analyze category preferences
-    order.items.forEach((item: any) => {
-      const category = item.category;
-      patterns.categoryPreferences[category] = (patterns.categoryPreferences[category] || 0) + 1;
-    });
-
-    // Analyze price preferences
-    const orderTotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-    if (patterns.pricePreferences.min === 0 || orderTotal < patterns.pricePreferences.min) {
-      patterns.pricePreferences.min = orderTotal;
-    }
-    if (orderTotal > patterns.pricePreferences.max) {
-      patterns.pricePreferences.max = orderTotal;
-    }
-  });
-
-  // Calculate average price
-  const totalSpent = orders.reduce((sum: number, order: any) =>
-    sum + order.items.reduce((orderSum: number, item: any) => orderSum + (item.price * item.quantity), 0), 0);
-  patterns.pricePreferences.avg = totalSpent / orders.length;
-
-  // Analyze seasonal preferences (month-based)
-  orders.forEach((order: any) => {
-    const orderMonth = new Date(order.orderDate || order.createdAt).getMonth();
-    order.items.forEach((item: any) => {
-      const foodId = item.foodId || item._id;
-      if (!patterns.seasonalPreferences[foodId]) {
-        patterns.seasonalPreferences[foodId] = {} as Record<number, number>;
-      }
-      patterns.seasonalPreferences[foodId][orderMonth] = (patterns.seasonalPreferences[foodId][orderMonth] || 0) + 1;
-    });
-  });
-
-  return patterns;
-}
-
-// NEW: Calculate frequency-based score
-function calculateFrequencyScore(foodId: string, orderFrequency: Record<string, number>) {
-  const count = orderFrequency[foodId] || 0;
-  if (count === 0) return { points: 0, count: 0 };
-
-  // Higher frequency = higher score (logarithmic scaling)
-  const points = Math.min(30, Math.log(count + 1) * 15);
-  return { points: Math.round(points), count };
-}
-
-// NEW: Calculate recency-based score
-function calculateRecencyScore(foodId: string, lastOrdered: Record<string, Date>) {
-  const lastOrder = lastOrdered[foodId];
-  if (!lastOrder) return { points: 0, reason: "" };
-
-  const daysSinceLastOrder = (Date.now() - lastOrder.getTime()) / (1000 * 60 * 60 * 24);
-
-  if (daysSinceLastOrder <= 1) {
-    return { points: 0, reason: "Ordered very recently" }; // Don't recommend if ordered today
-  } else if (daysSinceLastOrder <= 3) {
-    return { points: 15, reason: "Ordered recently (within 3 days)" };
-  } else if (daysSinceLastOrder <= 7) {
-    return { points: 25, reason: "Ordered last week" };
-  } else if (daysSinceLastOrder <= 30) {
-    return { points: 35, reason: "Ordered last month" };
-  } else {
-    return { points: 20, reason: "Ordered a while ago" };
-  }
-}
-
-// NEW: Calculate timing-based score
-function calculateTimingScore(foodId: string, orderTiming: Record<string, number[]>) {
-  const timingData = orderTiming[foodId];
-  if (!timingData || timingData.length === 0) return { points: 0, reason: "" };
-
-  const currentHour = new Date().getHours();
-  const avgOrderHour = timingData.reduce((sum, hour) => sum + hour, 0) / timingData.length;
-
-  // Check if current time matches when user typically orders this food
-  const timeDiff = Math.abs(currentHour - avgOrderHour);
-  if (timeDiff <= 2) {
-    return { points: 20, reason: `Typically ordered around this time (${Math.round(avgOrderHour)}:00)` };
-  } else if (timeDiff <= 4) {
-    return { points: 10, reason: `Sometimes ordered around this time` };
-  }
-
-  return { points: 0, reason: "" };
-}
-
-// NEW: Calculate sequence-based score
-function calculateSequenceScore(foodId: string, orderSequences: string[][], cart: CartItem[]) {
-  let points = 0;
-  let reason = "";
-
-  // Check if this food is often ordered with items in cart
-  const cartItemIds = cart.map(item => item._id);
-
-  orderSequences.forEach(sequence => {
-    if (sequence.includes(foodId)) {
-      const otherItems = sequence.filter(id => id !== foodId);
-      const matchingCartItems = otherItems.filter(id => cartItemIds.includes(id));
-
-      if (matchingCartItems.length > 0) {
-        points += 25;
-        reason = `Often ordered with items in your cart`;
-      }
-    }
-  });
-
-  return { points, reason };
-}
-
-// NEW: Calculate category preference score
-function calculateCategoryScore(category: string, categoryPreferences: Record<string, number>) {
-  const preference = categoryPreferences[category] || 0;
-  if (preference === 0) return { points: 0, reason: "" };
-
-  // Higher preference = higher score
-  const points = Math.min(20, preference * 2);
-  return { points, reason: "" };
-}
-
-// NEW: Calculate price preference score
-function calculatePriceScore(price: number, pricePreferences: any) {
-  const { min, max, avg } = pricePreferences;
-
-  if (min === 0 && max === 0) return { points: 0, reason: "" };
-
-  // Prefer items within user's typical price range
-  if (price >= min && price <= max) {
-    return { points: 20, reason: "Within your typical price range" };
-  } else if (price <= avg * 1.5) {
-    return { points: 15, reason: "Similar to your usual spending" };
-  } else if (price <= avg * 2) {
-    return { points: 10, reason: "Slightly above your usual spending" };
-  }
-
-  return { points: 0, reason: "" };
-}
-
-// NEW: Calculate seasonal preference score
-function calculateSeasonalScore(item: Food, seasonalPreferences: any) {
-  const currentMonth = new Date().getMonth();
-  const itemSeasonalData = seasonalPreferences[item._id];
-
-  if (!itemSeasonalData) return { points: 0, reason: "" };
-
-  const currentMonthOrders = itemSeasonalData[currentMonth] || 0;
-  const totalOrders = Object.values(itemSeasonalData).reduce((sum: any, count: any) => sum + count, 0);
-
-  if (totalOrders === 0) return { points: 0, reason: "" };
-
-  const seasonalRatio = currentMonthOrders / (totalOrders as number);
-
-  if (seasonalRatio > 0.3) {
-    return { points: 15, reason: "Seasonal favorite" };
-  } else if (seasonalRatio > 0.1) {
-    return { points: 10, reason: "Sometimes ordered this season" };
-  }
-
-  return { points: 0, reason: "" };
-}
-
-// NEW: Calculate similarity score
-function calculateSimilarityScore(item: Food, cart: CartItem[], patterns: any) {
-  let points = 0;
-  let reason = "";
-
-  // Check if user orders similar items together
-  cart.forEach(cartItem => {
-    if (cartItem.category === item.category && cartItem._id !== item._id) {
-      points += 15;
-      reason = "Similar to items in your cart";
-    }
-  });
-
-  return { points, reason };
-}
-
-// NEW: Content-based filtering algorithm for food recommendations
-function generateContentBasedRecommendations(allFoodItems: Food[], cart: CartItem[], userId: string) {
-  let recommendations: (Food & { reason: string[] })[] = [];
-
-  // Get user's ordering history and preferences
-  const userOrderHistory = getUserOrderHistory(userId);
-  const userProfile = buildUserProfile(userOrderHistory, cart);
-
-  // Analyze content similarity for each food item
-  allFoodItems.forEach(item => {
-    const reasons: string[] = [];
-
-    // Skip items already in cart
-    if (cart.some(cartItem => cartItem._id === item._id)) {
-      recommendations.push({ ...item, reason: ['Already in cart'] });
-      return;
-    }
-
-    // 1. INGREDIENT SIMILARITY ANALYSIS
-    const ingredientSimilarity = calculateIngredientSimilarity(item, userProfile.preferredIngredients);
-    if (ingredientSimilarity.score > 0) {
-      reasons.push(`Similar ingredients: ${ingredientSimilarity.matchedIngredients.join(', ')}`);
-    }
-
-    // 2. CATEGORY PREFERENCE ANALYSIS
-    const categoryScore = calculateCategoryPreference(item.category, userProfile.categoryPreferences);
-    if (categoryScore.points > 0) {
-      reasons.push(`Preferred category: ${item.category}`);
-    }
-
-    // 3. CUISINE TYPE SIMILARITY
-    const cuisineSimilarity = calculateCuisineSimilarity(item, userProfile.preferredCuisines);
-    if (cuisineSimilarity.score > 0) {
-      reasons.push(`Similar cuisine: ${cuisineSimilarity.cuisineType}`);
-    }
-
-    // 4. PRICE RANGE COMPATIBILITY
-    const priceScore = calculatePriceCompatibility(item.price, userProfile.pricePreferences);
-    if (priceScore.points > 0) {
-      reasons.push(priceScore.reason);
-    }
-
-    // 5. NUTRITIONAL PREFERENCE MATCHING
-    const nutritionScore = calculateNutritionalMatch(item.nutritionalInfo, userProfile.nutritionalPreferences);
-    if (nutritionScore.points > 0) {
-      reasons.push(nutritionScore.reason);
-    }
-
-    // 6. TEXT SIMILARITY (name and description)
-    const textSimilarity = calculateTextSimilarity(item, userProfile.preferredFoodNames);
-    if (textSimilarity.score > 0) {
-      reasons.push(`Similar to: ${textSimilarity.similarFood}`);
-    }
-
-    // 7. AVAILABILITY BOOST
-    if (item.isAvailable) {
-      reasons.push('Currently available');
-    }
-
-    // 8. SEASONAL RELEVANCE
-    const seasonalScore = calculateSeasonalRelevance(item, userProfile.seasonalPreferences);
-    if (seasonalScore.points > 0) {
-      reasons.push(seasonalScore.reason);
-    }
-
-    recommendations.push({
-      ...item,
-      reason: reasons.slice(0, 3) // Show top 3 reasons
-    });
-  });
-
-  // Sort by number of reasons (more reasons = higher recommendation)
-  recommendations.sort((a, b) => b.reason.length - a.reason.length);
-
-  // Return top 8 recommendations
-  return recommendations.slice(0, 2);
-}
-
-// NEW: Build comprehensive user profile from order history
-function buildUserProfile(orderHistory: any, cart: CartItem[]) {
-  const profile = {
-    preferredIngredients: {} as Record<string, number>,
-    categoryPreferences: {} as Record<string, number>,
-    preferredCuisines: {} as Record<string, number>,
-    pricePreferences: { min: 0, max: 0, avg: 0, preferredRange: [] as number[] },
-    nutritionalPreferences: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    preferredFoodNames: [] as string[],
-    seasonalPreferences: {} as Record<string, number>
-  };
-
-  // Analyze order history
-  if (orderHistory.orders && orderHistory.orders.length > 0) {
-    orderHistory.orders.forEach((order: any) => {
-      order.items.forEach((item: any) => {
-        // Extract food details (this would come from your actual food data)
-        const foodDetails = extractFoodDetails(item);
-
-        // Build ingredient preferences
-        if (foodDetails.ingredients) {
-          foodDetails.ingredients.forEach((ingredient: string) => {
-            profile.preferredIngredients[ingredient.toLowerCase()] = (profile.preferredIngredients[ingredient.toLowerCase()] || 0) + 1;
-          });
-        }
-
-        // Build category preferences
-        if (foodDetails.category) {
-          profile.categoryPreferences[foodDetails.category] = (profile.categoryPreferences[foodDetails.category] || 0) + 1;
-        }
-
-        // Build cuisine preferences
-        const cuisineType = detectCuisineType(foodDetails.name, foodDetails.category);
-        profile.preferredCuisines[cuisineType] = (profile.preferredCuisines[cuisineType] || 0) + 1;
-
-        // Build price preferences
-        if (foodDetails.price) {
-          profile.pricePreferences.preferredRange.push(foodDetails.price);
-        }
-
-        // Build nutritional preferences
-        if (foodDetails.nutritionalInfo) {
-          profile.nutritionalPreferences.calories += foodDetails.nutritionalInfo.calories || 0;
-          profile.nutritionalPreferences.protein += foodDetails.nutritionalInfo.protein || 0;
-          profile.nutritionalPreferences.carbs += foodDetails.nutritionalInfo.carbs || 0;
-          profile.nutritionalPreferences.fat += foodDetails.nutritionalInfo.fat || 0;
-        }
-
-        // Build food name preferences
-        profile.preferredFoodNames.push(foodDetails.name);
-      });
-    });
-
-    // Calculate averages
-    const totalOrders = orderHistory.orders.length;
-    if (profile.pricePreferences.preferredRange.length > 0) {
-      profile.pricePreferences.avg = profile.pricePreferences.preferredRange.reduce((a, b) => a + b, 0) / profile.pricePreferences.preferredRange.length;
-      profile.pricePreferences.min = Math.min(...profile.pricePreferences.preferredRange);
-      profile.pricePreferences.max = Math.max(...profile.pricePreferences.preferredRange);
-    }
-
-    if (totalOrders > 0) {
-      profile.nutritionalPreferences.calories /= totalOrders;
-      profile.nutritionalPreferences.protein /= totalOrders;
-      profile.nutritionalPreferences.carbs /= totalOrders;
-      profile.nutritionalPreferences.fat /= totalOrders;
-    }
-  }
-
-  // Analyze current cart
-  cart.forEach(item => {
-    // Add cart items to preferences
-    profile.categoryPreferences[item.category] = (profile.categoryPreferences[item.category] || 0) + 2; // Higher weight for current cart
-    profile.preferredFoodNames.push(item.name);
-  });
-
-  return profile;
-}
-
-// NEW: Calculate ingredient similarity between food items
-function calculateIngredientSimilarity(item: Food, preferredIngredients: Record<string, number>) {
-  let score = 0;
-  const matchedIngredients: string[] = [];
-
-  if (!item.ingredients || item.ingredients.length === 0) {
-    return { score: 0, matchedIngredients: [] };
-  }
-
-  item.ingredients.forEach(ingredient => {
-    const preference = preferredIngredients[ingredient.toLowerCase()] || 0;
-    if (preference > 0) {
-      score += preference * 5; // Higher preference = higher score
-      matchedIngredients.push(ingredient);
-    }
-  });
-
-  return { score: Math.min(score, 50), matchedIngredients };
-}
-
-// NEW: Calculate category preference score
-function calculateCategoryPreference(category: string, categoryPreferences: Record<string, number>) {
-  const preference = categoryPreferences[category] || 0;
-  if (preference === 0) return { points: 0, reason: '' };
-
-  const points = Math.min(30, preference * 3);
-  return { points, reason: `Likes ${category} foods` };
-}
-
-// NEW: Detect cuisine type from food name and category
-function detectCuisineType(name: string, category: string): string {
-  const lowerName = name.toLowerCase();
-  const lowerCategory = category.toLowerCase();
-
-  if (lowerName.includes('dosa') || lowerName.includes('idli') || lowerName.includes('sambar') || lowerCategory.includes('south indian')) {
-    return 'South Indian';
-  } else if (lowerName.includes('biryani') || lowerName.includes('kebab') || lowerName.includes('naan') || lowerCategory.includes('north indian')) {
-    return 'North Indian';
-  } else if (lowerName.includes('noodles') || lowerName.includes('fried rice') || lowerName.includes('manchurian')) {
-    return 'Chinese';
-  } else if (lowerName.includes('pizza') || lowerName.includes('pasta') || lowerName.includes('burger')) {
-    return 'Western';
-  } else if (lowerName.includes('sushi') || lowerName.includes('ramen') || lowerName.includes('tempura')) {
-    return 'Japanese';
-  } else {
-    return 'Other';
-  }
-}
-
-// NEW: Calculate cuisine similarity
-function calculateCuisineSimilarity(item: Food, preferredCuisines: Record<string, number>) {
-  const cuisineType = detectCuisineType(item.name, item.category);
-  const preference = preferredCuisines[cuisineType] || 0;
-
-  if (preference === 0) return { score: 0, cuisineType: '' };
-
-  const score = Math.min(40, preference * 8);
-  return { score, cuisineType };
-}
-
-// NEW: Calculate price compatibility
-function calculatePriceCompatibility(price: number, pricePreferences: any) {
-  const { min, max, avg } = pricePreferences;
-
-  if (min === 0 && max === 0) return { points: 0, reason: '' };
-
-  if (price >= min && price <= max) {
-    return { points: 25, reason: 'Within your preferred price range' };
-  } else if (price <= avg * 1.2) {
-    return { points: 20, reason: 'Similar to your usual spending' };
-  } else if (price <= avg * 1.5) {
-    return { points: 15, reason: 'Slightly above your usual spending' };
-  } else if (price <= avg * 2) {
-    return { points: 10, reason: 'Higher than usual but affordable' };
-  }
-
-  return { points: 0, reason: '' };
-}
-
-// NEW: Calculate nutritional match
-function calculateNutritionalMatch(nutritionalInfo: any, nutritionalPreferences: any) {
-  if (!nutritionalInfo || !nutritionalPreferences) return { points: 0, reason: '' };
-
-  let score = 0;
-  const tolerance = 0.3; // 30% tolerance
-
-  // Check if nutritional values are within preferred ranges
-  if (Math.abs(nutritionalInfo.calories - nutritionalPreferences.calories) <= nutritionalPreferences.calories * tolerance) {
-    score += 10;
-  }
-  if (Math.abs(nutritionalInfo.protein - nutritionalPreferences.protein) <= nutritionalPreferences.protein * tolerance) {
-    score += 10;
-  }
-
-  if (score > 0) {
-    return { points: score, reason: 'Matches your nutritional preferences' };
-  }
-
-  return { points: 0, reason: '' };
-}
-
-// NEW: Calculate text similarity
-function calculateTextSimilarity(item: Food, preferredFoodNames: string[]) {
-  let maxSimilarity = 0;
-  let mostSimilarFood = '';
-
-  preferredFoodNames.forEach(preferredName => {
-    const similarity = calculateStringSimilarity(item.name, preferredName);
-    if (similarity > maxSimilarity) {
-      maxSimilarity = similarity;
-      mostSimilarFood = preferredName;
-    }
-  });
-
-  const score = Math.min(30, maxSimilarity * 30);
-  return { score, similarFood: mostSimilarFood };
-}
-
-// NEW: Calculate string similarity using simple algorithm
-function calculateStringSimilarity(str1: string, str2: string): number {
-  const longer = str1.length > str2.length ? str1 : str2;
-  const shorter = str1.length > str2.length ? str2 : str1;
-
-  if (longer.length === 0) return 1.0;
-
-  const editDistance = levenshteinDistance(longer, shorter);
-  return (longer.length - editDistance) / longer.length;
-}
-
-// NEW: Levenshtein distance for string similarity
-function levenshteinDistance(str1: string, str2: string): number {
-  const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-
-  for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-  for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-
-  for (let j = 1; j <= str2.length; j++) {
-    for (let i = 1; i <= str1.length; i++) {
-      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1, // deletion
-        matrix[j - 1][i] + 1, // insertion
-        matrix[j - 1][i - 1] + indicator // substitution
+    // If no orders but has cart items, show items from cart's categories
+    if (!userOrders || userOrders.length === 0) {
+      console.log('👤 New user but has cart items, showing similar items');
+      const cartCategories = cart.map(item => item.category);
+      const categoryItems = allFoodItems.filter(item => 
+        cartCategories.includes(item.category) && !cart.some(cartItem => cartItem._id === item._id)
       );
+      return categoryItems.slice(0, 4).map((item, idx) => ({
+        ...item,
+        reason: ['Similar to items in your cart'],
+        totalScore: 0,
+        _sortKey: idx
+      }));
     }
-  }
 
-  return matrix[str2.length][str1.length];
+    // Analyze user's order history
+    const orderAnalysis = analyzeUserOrderData(userOrders, allFoodItems);
+    console.log('📈 Order analysis:', orderAnalysis);
+
+    // Score each food item based on analysis
+    allFoodItems.forEach(item => {
+      let totalScore = 0;
+      const reasons: string[] = [];
+
+      // Skip items already in cart
+      if (cart.some(cartItem => cartItem._id === item._id)) {
+        return;
+      }
+
+      // 1. HIGHEST PRIORITY: ORDER FREQUENCY & SPENDING ANALYSIS
+      const frequencyData = orderAnalysis.itemFrequency[item._id];
+      if (frequencyData) {
+        totalScore += frequencyData.frequency * 50; // Weight: 50 points per order
+        totalScore += frequencyData.totalSpent / 10; // Weight: 0.1 point per rupee spent
+        reasons.push(`You've ordered this ${frequencyData.frequency}x (₹${frequencyData.totalSpent} spent)`);
+      }
+
+      // 2. CATEGORY PREFERENCE
+      const categoryScore = orderAnalysis.categoryPreferences[item.category] || 0;
+      if (categoryScore > 0) {
+        totalScore += categoryScore * 15; // Weight: 15 points per category order
+        reasons.push(`You prefer ${item.category} items`);
+      }
+
+      // 3. TIMING PATTERN (Optional - if available)
+      if (orderAnalysis.orderingTimes && orderAnalysis.orderingTimes.length > 0) {
+        const currentHour = new Date().getHours();
+        const avgOrderTime = orderAnalysis.orderingTimes.reduce((a: number, b: number) => a + b, 0) / orderAnalysis.orderingTimes.length;
+        const timeDiff = Math.abs(currentHour - avgOrderTime);
+        
+        if (timeDiff <= 2) {
+          totalScore += 20;
+          reasons.push(`Often ordered around this time`);
+        }
+      }
+
+      // 4. PRICE PATTERN
+      if (orderAnalysis.avgPrice > 0) {
+        const priceRatio = item.price / orderAnalysis.avgPrice;
+        if (priceRatio >= 0.7 && priceRatio <= 1.3) {
+          totalScore += 15;
+          reasons.push(`Matches your usual price range`);
+        }
+      }
+
+      // 5. ITEMS ORDERED TOGETHER
+      if (orderAnalysis.itemsTogether[item._id]) {
+        const cartMatch = cart.filter(cartItem => 
+          orderAnalysis.itemsTogether[item._id].includes(cartItem._id)
+        ).length;
+        if (cartMatch > 0) {
+          totalScore += cartMatch * 25;
+          reasons.push(`Often ordered with items in your cart`);
+        }
+      }
+
+      // 6. AVAILABILITY BOOST
+      if (item.isAvailable) {
+        totalScore += 5;
+        reasons.push('Currently available');
+      }
+
+      // Only add items with scores or reasons
+      if (totalScore > 0 || reasons.length > 0) {
+        recommendations.push({
+          ...item,
+          reason: reasons.slice(0, 2),
+          totalScore
+        });
+      }
+    });
+
+    // Sort by total score (highest first)
+    recommendations.sort((a, b) => b.totalScore - a.totalScore);
+
+    console.log('🎯 Top recommendations:', recommendations.slice(0, 4).map(r => ({
+      name: r.name,
+      score: r.totalScore,
+      reasons: r.reason
+    })));
+
+    // Return top 4 recommendations
+    return recommendations.slice(0, 4).map((item, idx) => ({
+      ...item,
+      _sortKey: idx
+    }));
+
+  } catch (error) {
+    console.error('❌ Error in recommendations:', error);
+    // Fallback to popular items
+    return allFoodItems.slice(0, 4).map((item, idx) => ({
+      ...item,
+      reason: ['Popular item'],
+      totalScore: 0,
+      _sortKey: idx
+    }));
+  }
 }
 
-// NEW: Calculate seasonal relevance
-function calculateSeasonalRelevance(item: Food, seasonalPreferences: Record<string, number>) {
-  const currentMonth = new Date().getMonth();
-  const itemSeasonalData = seasonalPreferences[item._id];
-
-  if (!itemSeasonalData) return { points: 0, reason: '' };
-
-  const currentMonthOrders = itemSeasonalData[currentMonth] || 0;
-  const totalOrders = Object.values(itemSeasonalData).reduce((sum: any, count: any) => sum + count, 0);
-
-  if (totalOrders === 0) return { points: 0, reason: '' };
-
-  const seasonalRatio = currentMonthOrders / totalOrders;
-
-  if (seasonalRatio > 0.3) {
-    return { points: 20, reason: 'Seasonal favorite' };
-  } else if (seasonalRatio > 0.1) {
-    return { points: 15, reason: 'Sometimes ordered this season' };
+// Fetch user's orders from backend
+async function fetchUserOrders(userId: string) {
+  try {
+    const response = await fetch(`http://localhost:5000/api/orders/user/${userId}`);
+    if (!response.ok) {
+      console.log('ℹ️ No orders found for user (first time)');
+      return [];
+    }
+    const data = await response.json();
+    return data.orders || [];
+  } catch (error) {
+    console.error('Error fetching user orders:', error);
+    return [];
   }
-
-  return { points: 0, reason: '' };
 }
 
-// NEW: Extract food details from order items
-function extractFoodDetails(orderItem: any) {
-  // This function would extract detailed food information
-  // For now, return basic structure - you can enhance this based on your data
-  return {
-    name: orderItem.name || '',
-    category: orderItem.category || '',
-    price: orderItem.price || 0,
-    ingredients: orderItem.ingredients || [],
-    nutritionalInfo: orderItem.nutritionalInfo || { calories: 0, protein: 0, carbs: 0, fat: 0 }
+// Analyze user's order data to extract patterns
+function analyzeUserOrderData(orders: any[], allFoodItems: Food[]) {
+  const analysis = {
+    itemFrequency: {} as Record<string, { frequency: number; totalSpent: number }>,
+    categoryPreferences: {} as Record<string, number>,
+    orderingTimes: [] as number[],
+    avgPrice: 0,
+    itemsTogether: {} as Record<string, string[]>
   };
+
+  if (!orders || orders.length === 0) {
+    return analysis;
+  }
+
+  let totalAmount = 0;
+
+  orders.forEach((order: any) => {
+    if (!order.items || order.items.length === 0) return;
+
+    // Record order time (hour)
+    try {
+      const orderHour = new Date(order.createdAt).getHours();
+      analysis.orderingTimes.push(orderHour);
+    } catch (e) {
+      // ignore
+    }
+
+    // Analyze each item in the order
+    order.items.forEach((orderItem: any) => {
+      const itemId = orderItem.foodId || orderItem._id;
+      const itemPrice = orderItem.price || 0;
+      const quantity = orderItem.quantity || 1;
+
+      // Track frequency and spending
+      if (!analysis.itemFrequency[itemId]) {
+        analysis.itemFrequency[itemId] = { frequency: 0, totalSpent: 0 };
+      }
+      analysis.itemFrequency[itemId].frequency += quantity;
+      analysis.itemFrequency[itemId].totalSpent += itemPrice * quantity;
+
+      // Track category preference
+      const category = orderItem.category || 'unknown';
+      analysis.categoryPreferences[category] = (analysis.categoryPreferences[category] || 0) + quantity;
+
+      // Track items ordered together
+      const otherItemIds = order.items
+        .filter((item: any) => (item.foodId || item._id) !== itemId)
+        .map((item: any) => item.foodId || item._id);
+
+      if (otherItemIds.length > 0) {
+        if (!analysis.itemsTogether[itemId]) {
+          analysis.itemsTogether[itemId] = [];
+        }
+        analysis.itemsTogether[itemId].push(...otherItemIds);
+      }
+
+      totalAmount += itemPrice * quantity;
+    });
+  });
+
+  // Calculate average price per item
+  const totalItems = Object.values(analysis.itemFrequency).reduce((sum: number, item: any) => sum + item.frequency, 0);
+  analysis.avgPrice = totalItems > 0 ? totalAmount / totalItems : 0;
+
+  // Remove duplicates from itemsTogether
+  Object.keys(analysis.itemsTogether).forEach(key => {
+    analysis.itemsTogether[key] = [...new Set(analysis.itemsTogether[key])];
+  });
+
+  return analysis;
 }
 
 export default function Food() {
@@ -782,6 +328,7 @@ export default function Food() {
   const [ordersList, setOrdersList] = useState<any[]>([]);
   const [showOrderPopup, setShowOrderPopup] = useState(false);
   const [lastOrder, setLastOrder] = useState<any | null>(null);
+  const [recommendations, setRecommendations] = useState<(Food & { reason: string[]; _sortKey: number })[]>([]);
 
   // Note: Authentication is handled by PrivateRoute in App.tsx
   // This component will only render if user is logged in
@@ -906,6 +453,24 @@ export default function Food() {
     };
     fetchCart();
   }, []);
+
+  // Load recommendations when foods or cart changes
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      if (foods.length === 0) return;
+      
+      const userId = getUserId();
+      try {
+        const recs = await generatePredictiveRecommendations(foods, cart as any, userId);
+        setRecommendations(recs);
+      } catch (error) {
+        console.error('Error loading recommendations:', error);
+        setRecommendations([]);
+      }
+    };
+    
+    loadRecommendations();
+  }, [foods, cart]);
 
   // Fetch seat availability
   const fetchSeatAvailability = async () => {
@@ -1043,7 +608,7 @@ export default function Food() {
     try {
       const userId = getUserId();
       const amount = getTotalPrice();
-
+      console.log(userId,amount)
       // Get user information from localStorage
       const userInfo = localStorage.getItem('user-info');
       let userName = "Guest User";
@@ -1087,10 +652,10 @@ export default function Food() {
 
       // Initialize Razorpay payment
       const options = {
-        key: 'rzp_test_R9Gsfwn9dWKpPN',
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: data.order.amount,
         currency: data.order.currency,
-        name: 'Yendine Food',
+        name: 'Quick Tap',
         description: 'Food Order Payment',
         order_id: data.order.id,
         handler: async function (response: any) {
@@ -1122,6 +687,7 @@ export default function Food() {
                 }
               }),
             });
+            console.log(verifyResponse)
 
             if (verifyResponse.ok) {
               const verifyData = await verifyResponse.json();
@@ -1496,20 +1062,17 @@ export default function Food() {
     return acc;
   }, {});
 
-  // Recommendation logic using content-based filtering
-  const recommendations = generateContentBasedRecommendations(foods, cart as any, getUserId());
-
-  // Fallback: If no recommendations, show popular items
-  const fallbackRecommendations = recommendations.length === 0 ?
-    foods.slice(0, 2).map(item => ({ ...item, reason: ['Popular item'] })) :
-    recommendations;
+  // Only show recommendations if user has orders or cart items
+  const fallbackRecommendations = recommendations.length > 0 ?
+    recommendations.slice(0, 4).map((item, idx) => ({ ...item, _sortKey: idx })) :
+    [];
 
   // Debug: Log recommendation details
   console.log('Food recommendations:', {
     totalFoods: foods.length,
     recommendationsCount: recommendations.length,
     fallbackCount: fallbackRecommendations.length,
-    recommendations: recommendations.map(r => ({ name: r.name, category: r.category, reasonCount: r.reason.length })),
+    recommendations: fallbackRecommendations.map((r: any) => ({ name: r.name, category: r.category, reasons: r.reason })),
     cartItems: cart.length
   });
 
@@ -1545,23 +1108,20 @@ export default function Food() {
     <DefaultLayout>
       <div className="container py-8 t">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-quicktap-creamy">Campus Food Ordering</h1>
+          <h1 className="text-3xl font-bold text-quicktap-creamy">Order Your Food</h1>
         </div>
 
 
 
-        {/* Food Recommendation Section */}
+        {/* Food Recommendation Section - Only show if user has order history or cart items */}
+        {fallbackRecommendations.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-3 text-quicktap-creamy/60">Recommended food</h2>
+          <h2 className="text-xl font-semibold mb-3 text-quicktap-creamy/60">Recommended for you</h2>
 
-          {fallbackRecommendations.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg">
-              <p className="text-muted-foreground text-sm">No recommendations at this time. Try adding some items to your cart!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4 place-self-center  ">
-              {fallbackRecommendations.map(item => (
-                <Card key={item._id} className=" hover:scale-105 duration-200 transition-all w-[200px] rounded-3xl flex flex-col items-center gap-3 p-3 hover:shadow-md ">
+          {fallbackRecommendations.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 place-self-center  ">
+              {fallbackRecommendations.map((item: any, index) => (
+                <Card key={`recommend-${item._id}-${item._sortKey}`} className=" hover:scale-105 duration-200 transition-all w-[200px] rounded-3xl flex flex-col items-center gap-3 p-3 hover:shadow-md ">
                   <img
                     src={item.image || "/placeholder.svg"}
                     alt={item.name}
@@ -1571,6 +1131,12 @@ export default function Food() {
                     <p className="font-medium text-md">{item.name}</p>
                     <p className="text-sm text-muted-foreground">₹{item.price}</p>
                     <p className="text-sm text-quicktap-teal">{item.category}</p>
+                    {item.reason && item.reason.length > 0 && (
+                      <span>
+                        <p className="text-xs text-quicktap-darkGray/60 mt-1">.{item.reason[0]}</p>
+                        <p className="text-xs text-quicktap-darkGray/60 mt-1">.{item.reason[1]}</p>
+                      </span>
+                    )}
 
                     <Button
                       size="sm"
@@ -1589,13 +1155,11 @@ export default function Food() {
           {/* Recommendation Stats */}
           <div className="mt-4 text-center text-quicktap-lightGray/70 text-sm ">
             <p>
-              AI-powered recommendations from available items
-              {recommendations.length === 0 && fallbackRecommendations.length > 0 &&
-                ' (using popular items as fallback)'
-              }
+              Based on your order history and preferences
             </p>
           </div>
         </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Food Menu Section */}
@@ -1611,13 +1175,13 @@ export default function Food() {
                     <p className="text-muted-foreground">No food items available</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ">
                     {Object.entries(foodsByCategory).map(([category, items]) => (
-                      <div key={category} className="col-span-2">
-                        <h3 className="text-lg font-semibold mb-4 capitalize text-quicktap-creamy ">{category}</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div key={category} className="col-span-2 ">
+                        <h3 className="text-2xl font-semibold mb-4 capitalize text-quicktap-creamy ">{category}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ">
                           {items.map(item => (
-                            <FoodItem key={item._id} item={item} onAddToCart={addToCart} cartLoading={cartLoading} />
+                            <FoodItem  key={item._id} item={item} onAddToCart={addToCart} cartLoading={cartLoading} />
                           ))}
                         </div>
                       </div>

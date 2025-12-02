@@ -18,7 +18,7 @@ const foodSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['main', 'appetizer', 'dessert', 'beverage','cooldrink','noodles']
+    enum: ['meals', 'appetizer', 'dessert', 'beverage','cooldrink','noodles']
   },
   image: {
     type: String,

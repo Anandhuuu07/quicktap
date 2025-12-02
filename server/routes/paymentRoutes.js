@@ -117,7 +117,7 @@ router.post('/create-cart-order', async (req, res) => {
 // Verify Razorpay payment
 router.post('/verify', async (req, res) => {
   try {
-    const secretKey = process.env.RAZORPAY_KEY_SECRET || 'jEQ0qUumMXfWmdfzkCvpGA0T';
+    const secretKey = process.env.RAZORPAY_KEY_SECRET ;
 
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId, userName, amount, orderDetails } = req.body;
 

@@ -33,7 +33,7 @@ export default function Home() {
                 hola, Quick - Tap
               </h1>
               <p className="mx-auto max-w-[300px] text-quicktap-creamy/50 md:text-3xl font-bold">
-                Order food. Shop groceries. Swiggy it!
+                Crave??? We got you covered, Tap. Eat. Repeat.!
               </p>
             </div>
             <div>

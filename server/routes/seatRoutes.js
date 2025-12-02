@@ -96,14 +96,15 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
-} else {
-  // Use test keys if environment variables are not set
-  razorpay = new Razorpay({
-    key_id: 'rzp_test_R9Gsfwn9dWKpPN',
-    key_secret: 'jEQ0qUumMXfWmdfzkCvpGA0T',
-  });
-  console.log('Using Razorpay test keys for seat booking');
 }
+// } else {
+//   // Use test keys if environment variables are not set
+//   razorpay = new Razorpay({
+//     key_id: 'rzp_test_R9Gsfwn9dWKpPN',
+//     key_secret: 'jEQ0qUumMXfWmdfzkCvpGA0T',
+//   });
+//   console.log('Using Razorpay test keys for seat booking');
+// }
 
 // Verify Razorpay payment signature
 const verifyPaymentSignature = (orderId, paymentId, signature) => {

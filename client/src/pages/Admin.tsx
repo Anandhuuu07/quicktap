@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImageUpload } from "@/components/ui/image-upload";
-import { FeedbackDisplay } from "@/components/FeedbackDisplay";
 import SeatAdminDashboard from "@/components/SeatAdminDashboard";
 import { checkAdminStatus } from "@/services/api";
 import { Loader, Loader2, ShieldX } from "lucide-react";
@@ -458,66 +457,20 @@ export default function Admin() {
     }
   };
 
-  const handleSendAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const form = e.target as HTMLFormElement;
-      const formData = new FormData(form);
-      const userInfo = localStorage.getItem('user-info');
-      const token = userInfo ? JSON.parse(userInfo).token : null;
-
-      // Read optional image file as base64 data URL
-      let imageBase64: string | undefined = undefined;
-      const imageFile = formData.get('image') as File | null;
-      if (imageFile && imageFile.size > 0) {
-        imageBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error('Failed to read image'));
-          reader.readAsDataURL(imageFile);
-        });
-      }
-
-      const response = await fetch('http://localhost:5000/api/announcements', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          title: formData.get('title'),
-          message: formData.get('message'),
-          image: imageBase64
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to send announcement');
-
-      toast.success('Announcement sent to all users!');
-      form.reset();
-    } catch (error) {
-      toast.error('Failed to send announcement');
-    }
-  };
-
-
-
   return (
     <DefaultLayout>
       <div className="container py-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Admin Panel</h1>
-          <Badge className="bg-quicktap-navy text-white">Admin Access</Badge>
+          <h1 className="text-3xl font-bold text-quicktap-creamy">Admin Panel</h1>
         </div>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} >
-          <TabsList className="flex flex-wrap lg:grid lg:grid-cols-8 mb-8 w-full h-full ">
+          <TabsList className="flex flex-wrap lg:grid lg:grid-cols-8 mb-8 w-full h-full place-item-center ">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="orders">Food Orders</TabsTrigger>
             <TabsTrigger value="foods">Food Management</TabsTrigger>
-            <TabsTrigger value="seats">Seat Management</TabsTrigger>
+            {/* <TabsTrigger value="seats">Seat Management</TabsTrigger> */}
             <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="feedback">Feedback</TabsTrigger>
           </TabsList>
 
           {/* Dashboard Tab */}
@@ -579,37 +532,6 @@ export default function Admin() {
                 </CardContent>
               </Card>
             </div>
-
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Send Announcement</CardTitle>
-                <CardDescription>Notify all users of important updates</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSendAnnouncement} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Announcement Title</label>
-                    <Input name="title" placeholder="Enter announcement title" required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Message</label>
-                    <Textarea name="message" placeholder="Enter announcement message" rows={4} required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Image (Optional)</label>
-                    <Input type="file" name="image" accept="image/*" />
-                  </div>
-                  <div className="flex gap-4">
-                    <Button
-                      type="submit"
-                      className="bg-quicktap-orange hover:bg-quicktap-orange/90 text-white"
-                    >
-                      Send to All Users
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Orders Tab */}
@@ -630,7 +552,7 @@ export default function Admin() {
                         <th className="p-3 text-left">Total</th>
                         <th className="p-3 text-left">Status</th>
                         <th className="p-3 text-left">Payment</th>
-                        <th className="p-3 text-left">Seats</th>
+                        {/* <th className="p-3 text-left">Seats</th> */}
                         <th className="p-3 text-left">Actions</th>
                       </tr>
                     </thead>
@@ -735,7 +657,7 @@ export default function Admin() {
                 </div>
                 <Dialog open={isAddFoodDialogOpen} onOpenChange={setIsAddFoodDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-quicktap-navy hover:bg-quicktap-navy/90 text-white">
+                    <Button className="bg-quicktap-green hover:bg-quicktap-green/90 text-white">
                       Add Food Item
                     </Button>
                   </DialogTrigger>
@@ -806,7 +728,7 @@ export default function Admin() {
                       </div>
                       <Button
                         type="submit"
-                        className="w-full bg-quicktap-navy hover:bg-quicktap-navy/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-quicktap-green hover:bg-quicktap-green/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={isAddingFood}
                       >
                         {isAddingFood ? (
@@ -984,18 +906,7 @@ export default function Admin() {
 
 
 
-          {/* Feedback Tab */}
-          <TabsContent value="feedback">
-            <FeedbackDisplay
-              showStats={true}
-              showPagination={true}
-              limit={10}
-              showDelete={true}
-              onDelete={(id) => {
-                setFeedbacks(feedbacks.filter(fb => fb._id !== id));
-              }}
-            />
-          </TabsContent>
+        
         </Tabs>
       </div>
 
@@ -1069,7 +980,7 @@ export default function Admin() {
               </div>
               <Button
                 type="submit"
-                className="w-full bg-quicktap-navy hover:bg-quicktap-navy/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-quicktap-green hover:bg-quicktap-green/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isEditingFood}
               >
                 {isEditingFood ? (
