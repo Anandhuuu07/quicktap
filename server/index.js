@@ -254,7 +254,5 @@ app.get('*', (req, res) => {
 const serverUrls = config.getServerUrls();
 app.listen(config.port, '0.0.0.0', () => {
   console.log(`Server is running on port ${config.port}`);
-  console.log(`Server accessible at:`);
   console.log(`  - Local: ${serverUrls.local}`);
-  console.log(`  - Network: ${serverUrls.network}`);
 });
