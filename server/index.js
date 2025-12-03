@@ -49,14 +49,14 @@ setTimeout(() => {
       // Also clean expired temporary reservations
       const SeatBooking = require('./models/seatBooking');
       await SeatBooking.cleanExpiredTempReservations();
-      console.log('Seat booking cleanup completed at:', new Date().toISOString());
+      // console.log('Seat booking cleanup completed at:', new Date().toISOString());
     } catch (error) {
       console.error('Scheduled cleanup failed:', error);
     }
   }, 5 * 60 * 1000); // 5 minutes
   
-  console.log('Seat booking cleanup job scheduled (every 5 minutes)');
-  console.log('Temporary reservation cleanup job scheduled (every 5 minutes)');
+  // console.log('Seat booking cleanup job scheduled (every 5 minutes)');
+  // console.log('Temporary reservation cleanup job scheduled (every 5 minutes)');
 }, 2000); // Wait 2 seconds for DB connection to establish
 
 // API Routes
