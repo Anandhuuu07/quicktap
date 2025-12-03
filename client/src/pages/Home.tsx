@@ -88,18 +88,17 @@ export default function Home() {
               {/* <img src="../../public/undraw_breakfast_rgx5.svg" alt="" className="size-64" /> */}
 
             </div>
-            <div className="space-x-4">
-              <Button asChild className="bg-quicktap-creamy hover:bg-quicktap-creamy/60 text-quicktap-green h-[50px] w-[180px]">
-                <Link to="/food" className="text-xl">Order Now</Link>
+            <div className="flex flex-col gap-3 md:gap-4 md:flex-row justify-center items-center mt-6 w-full px-4 md:px-0">
+              <Button asChild className="bg-quicktap-creamy hover:bg-quicktap-creamy/60 text-quicktap-green h-[50px] w-full md:w-[180px] text-lg md:text-xl font-semibold">
+                <Link to="/food">Order Now</Link>
+              </Button> 
+              <Button asChild className="bg-transparent hover:bg-quicktap-creamy backdrop-blur text-quicktap-creamy hover:text-quicktap-teal border h-[50px] w-full md:w-[180px] text-lg md:text-xl font-semibold">
+                <Link to="/food">Brows Menu</Link>
               </Button>
-              <Button asChild className="bg-transparent hover:bg-quicktap-creamy  backdrop-blur text-quicktap-creamy hover:text-quicktap-teal  border h-[50px] w-[180px]">
-                <Link to="/food" className="text-xl">Brows Menu</Link>
-              </Button>
-
             </div>
           </div>
         </div>
-      </section>
+      </section>  
 
       {/* Features Section */}
       <section className="py-5 md:py-5 w-full ">
