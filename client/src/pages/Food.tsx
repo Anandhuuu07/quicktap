@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FeedbackService } from "@/services/feedbackService";
 import { SeatService } from "@/services/seatService";
 import { CartService, Cart, CartItem } from "@/services/cartService";
@@ -1112,20 +1112,39 @@ export default function Food() {
 
   return (
     <DefaultLayout>
-      {/* Floating Feedback Button */}
-      <button
-        onClick={handleFeedbackClick}
-        className=" hover:duration-200 hover:transition-all transition-all duration-200 fixed bottom-6 right-6 z-50 bg-quicktap-teal hover:bg-quicktap-teal/90 text-white 
-                   rounded-full p-4 shadow-lg hover:shadow-xl 
-                   flex items-center gap-2 group"
-        title="Leave a Review"
-      >
-        <svg className=" hover:duration-200 hover:transition-all transition-all duration-200 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-        </svg>
-        <span className=" hover:duration-200 hover:transition-all transition-all duration-200 hidden group-hover:inline-block font-medium">Rate Us</span>
-      </button>
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+        {/* Get Offers Button */}
+        <Link to="/loyalty">
+          <button
+            className="bg-quicktap-creamy hover:bg-quicktap-creamy/90 text-quicktap-navy 
+                       rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 
+                       flex items-center gap-2 group"
+            title="Get Offers"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+            </svg>
+            <span className="hidden group-hover:inline-block font-medium">Get Offers</span>
+          </button>
+        </Link>
+
+        {/* Rate Us Button */}
+        <button
+          onClick={handleFeedbackClick}
+          className="bg-quicktap-teal hover:bg-quicktap-teal/90 text-white 
+                     rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200 
+                     flex items-center gap-2 group"
+          title="Leave a Review"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+          <span className="hidden group-hover:inline-block font-medium">Rate Us</span>
+        </button>
+      </div>
 
       <div className=" hover:duration-200 hover:transition-all transition-all duration-200 container py-8 t">
         <div className=" hover:duration-200 hover:transition-all transition-all duration-200 flex justify-between items-center mb-8">

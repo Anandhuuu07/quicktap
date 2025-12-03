@@ -64,7 +64,7 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				
+
 				quicktap: {
 					green: '#01422c',
 					teal: '#16C79A',
@@ -101,8 +101,11 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
 			},
-			
+
 		},
 	},
-	plugins: [tailwindcssAnimate],
+	plugins: [tailwindcssAnimate, function ({ addVariant }: { addVariant: (name: string, selector: string) => void }) {
+		addVariant('group-loyalty-hover', ':merge(.group-loyalty):hover &');
+		addVariant('group-feedback-hover', ':merge(.group-feedback):hover &');
+	},],
 } satisfies Config;

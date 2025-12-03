@@ -9,6 +9,7 @@ import Food from "./pages/Food";
 import Community from "./pages/Community";
 import Chatbot from "./pages/Chatbot";
 import Admin from "./pages/Admin";
+import Loyalty from "./pages/Loyalty";
 import NotFound from "./pages/NotFound";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import GoogleLogin from "./pages/GoogleLogin";
@@ -60,6 +61,7 @@ const App = () => {
             <Route path="/food" element={<PrivateRoute element={<Food />} />} />
             <Route path="/community" element={<PrivateRoute element={<Community />} />} />
             <Route path="/chatbot" element={<PrivateRoute element={<Chatbot />} />} />
+            <Route path="/loyalty" element={<PrivateRoute element={<Loyalty />} />} />
             <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="/scan-qr" element={<PrivateRoute element={<QRCodeScanner />} />} />
             <Route path="*" element={<NotFound />} />
